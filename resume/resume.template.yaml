@@ -1,0 +1,81 @@
+# Template — copy to resume/private/resume.yaml and fill in real values.
+# Real file is gitignored. This template is committed for portfolio-piece visibility.
+
+meta:
+  name: "Your Name"
+  phone: "+XXX-XXX-XXXX"
+  email: "you@example.com"
+  github: "https://github.com/username"
+  linkedin: "https://linkedin.com/in/username"
+  location: "City, Country"
+  languages_spoken: ["English (Fluent)"]
+
+# Headline / one-line positioning. Tailoring may rewrite per category.
+headline: "One-line positioning."
+
+# Per-category headline overrides. Keys map to tracker categories.
+headline_by_category:
+  crypto_mm: ""
+  broker_tech: ""
+  eu_prop: ""
+  africa_treasury: ""
+  fintech_generalist: ""
+
+education:
+  - degree: "BBA Finance, BS Math"
+    school: "University Name"
+    location: "City, State"
+    dates: ""
+    notes:
+      - "Relevant coursework or honors"
+
+# Experience entries. `bullets` are raw — tailoring will select/reword.
+# `tags` let the scorer/tailor pick relevant bullets per JD category.
+experience:
+  - title: "Algorithmic Trading Researcher (self-directed)"
+    company: "Independent Algorithmic Trading Desk"
+    location: "Remote"
+    dates: "01/25 – Present"
+    tags: [crypto_mm, broker_tech, eu_prop, fintech_generalist]
+    bullets:
+      - text: "Built live execution bridge X."
+        tags: [broker_tech, eu_prop]
+      - text: "Custom MCP servers exposing broker state to LLM agents."
+        tags: [crypto_mm, fintech_generalist]
+      - text: "Statistical validation: CRLB, KS, ADF, Hurst, bootstrap CIs."
+        tags: [crypto_mm, eu_prop]
+
+  - title: "Treasury Analyst"
+    company: "Bank Name"
+    location: "City, Country"
+    dates: "MM/YY – MM/YY"
+    tags: [africa_treasury, fintech_generalist]
+    bullets:
+      - text: "FX arbitrage trades XOF/XAF via 360T."
+        tags: [africa_treasury]
+      - text: "Multi-currency deals with central bank, saved $X."
+        tags: [africa_treasury]
+
+projects:
+  - name: "project-name"
+    url: "https://github.com/..."
+    blurb: "One-line description."
+    tags: [crypto_mm, broker_tech]
+    stack: ["Python", "Docker"]
+
+skills:
+  languages: ["Python (Expert)", "MQL5", "TypeScript"]
+  ai_tooling: ["Claude Code", "MCP", "Anthropic API"]
+  frameworks: ["Nautilus Trader", "MetaTrader 5", "FastAPI"]
+  quant: ["FX microstructure", "Monte Carlo", "Statistical validation"]
+
+# Free-form blocks for cover letters / about sections.
+narrative:
+  short_about: "Two sentences about who you are and what you're building."
+  why_now: "Two sentences on why job-searching now."
+  category_pitches:
+    crypto_mm: "Pitch for crypto MM roles."
+    broker_tech: "Pitch for broker tech roles."
+    eu_prop: "Pitch for EU prop firm roles."
+    africa_treasury: "Pitch for Africa treasury roles."
+    fintech_generalist: "Pitch for fintech generalist roles."

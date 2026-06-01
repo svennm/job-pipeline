@@ -1,0 +1,57 @@
+# Secrets / personal
+.env
+.env.*
+!.env.example
+config/secrets.yaml
+config/secrets.yml
+
+# User's local config (copy of example, may diverge w/ personal preferences)
+config/config.yaml
+config/config.yml
+
+# Private resume (PII: phone, email, address)
+resume/private/
+resume/*.private.yaml
+resume/*.private.yml
+
+# Generated application drafts (per-application output)
+queue/
+
+# Scraped raw outputs (may contain user-tagged URLs / cookies)
+data/raw/
+data/cache/
+
+# Tracker — keep schema public, hide live state
+tracker/live.csv
+tracker/*.private.csv
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+logs/
+
+# Third-party tools (cloned, not part of this repo)
+tools/
+
