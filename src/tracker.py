@@ -133,29 +133,38 @@ def append() -> None:
 
 
 @cli.command()
-@click.argument("company")
+@click.argument("query")
 @click.option("--status", required=True, help="applied / followed_up / replied / rejected / ghosted etc")
 @click.option("--note", default=None, help="Append to notes column")
-def mark(company: str, status: str, note: str | None) -> None:
-    """Update status for a company row. Case-insensitive substring match."""
+@click.option("--by", default="role_url", type=click.Choice(["role_url", "company", "role_focus"]),
+              help="Column to match against. Default role_url (exact), avoids accidental substring hits across multiple roles.")
+@click.option("--exact", is_flag=True, help="Exact match instead of substring.")
+def mark(query: str, status: str, note: str | None, by: str, exact: bool) -> None:
+    """Update status for matching rows. Default matches role_url EXACTLY.
+
+    For company substring (old behavior): --by company
+    """
     p = _tracker_path()
     rows = _read_rows(p)
     today = dt.date.today().isoformat()
     hits = 0
     for r in rows:
-        if company.lower() in r["company"].lower():
-            r["status"] = status
-            if status == "applied":
-                r["applied_date"] = today
-                follow = dt.date.today() + dt.timedelta(days=7)
-                r["follow_up_date"] = follow.isoformat()
-            r["last_contact"] = today
-            if note:
-                sep = " | " if r["notes"] else ""
-                r["notes"] = f"{r['notes']}{sep}{note}"
-            hits += 1
+        haystack = r.get(by, "") or ""
+        ok = (haystack.lower() == query.lower()) if exact or by == "role_url" else (query.lower() in haystack.lower())
+        if not ok:
+            continue
+        r["status"] = status
+        if status == "applied":
+            r["applied_date"] = today
+            follow = dt.date.today() + dt.timedelta(days=7)
+            r["follow_up_date"] = follow.isoformat()
+        r["last_contact"] = today
+        if note:
+            sep = " | " if r["notes"] else ""
+            r["notes"] = f"{r['notes']}{sep}{note}"
+        hits += 1
     _write_rows(p, rows)
-    console.print(f"[green]updated[/green] {hits} row(s) for '{company}' -> status={status}")
+    console.print(f"[green]updated[/green] {hits} row(s) by {by}={query!r} -> status={status}")
 
 
 if __name__ == "__main__":

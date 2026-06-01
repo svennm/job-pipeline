@@ -82,11 +82,155 @@ def _ready(entry: dict) -> bool:
 
 # ============== ATS-specific handlers ==============
 
+def _safe_fill(page, sel: str, val: str, log: list[str]) -> bool:
+    """Type into a selector with React-friendly key events. Returns True on success.
+
+    Uses .type() (per-keystroke) rather than .fill() because Greenhouse's React
+    controlled inputs sometimes reject .fill() (the value attribute updates but
+    React state doesn't, and React reverts on next render). .type() works because
+    it dispatches real keydown/keyup events that React listens for.
+    """
+    if not val:
+        return False
+    try:
+        el = page.query_selector(sel)
+        if el is None:
+            return False
+        tag = (el.evaluate("e => e.tagName") or "").lower()
+        if tag not in ("input", "textarea"):
+            log.append(f"  skipped {sel} (tag={tag})")
+            return False
+        el.scroll_into_view_if_needed(timeout=2000)
+        el.click()
+        page.wait_for_timeout(50)
+        # Clear any existing value first
+        try:
+            el.evaluate("e => { e.value = ''; e.dispatchEvent(new Event('input', {bubbles:true})); }")
+        except Exception:
+            pass
+        el.type(val, delay=8)
+        # Dispatch blur to commit React state
+        try:
+            el.evaluate("e => { e.dispatchEvent(new Event('change', {bubbles:true})); e.blur(); }")
+        except Exception:
+            pass
+        log.append(f"  typed {sel}")
+        return True
+    except Exception as e:
+        log.append(f"  err {sel}: {str(e)[:80]}")
+        return False
+
+
+def _safe_upload(page, sel: str, path: str, log: list[str]) -> bool:
+    try:
+        el = page.query_selector(sel)
+        if el is None:
+            return False
+        el.set_input_files(path)
+        # Dispatch change event manually — Greenhouse React component sometimes
+        # needs this to update its visible drop-zone state.
+        try:
+            el.evaluate("e => e.dispatchEvent(new Event('change', {bubbles: true}))")
+        except Exception:
+            pass
+        log.append(f"  uploaded {sel} <- {path}")
+        return True
+    except Exception as e:
+        log.append(f"  upload err {sel}: {str(e)[:80]}")
+        return False
+
+
+def _click_react_select(page, field_name: str, answer: str, log: list[str]) -> bool:
+    """Pick an option in a Greenhouse React-Select combobox by typing the answer.
+
+    React-Select supports type-to-filter then Enter to confirm. We:
+      1. Click the combobox input to focus it
+      2. Type the answer (filters options)
+      3. Press Enter (picks the filtered top option)
+    This is more robust than searching the DOM for option items, which live in a
+    portal outside the combobox subtree.
+    """
+    sel = f"input#{field_name}"
+    try:
+        el = page.query_selector(sel)
+        if el is None:
+            log.append(f"  no combobox {field_name}")
+            return False
+        el.scroll_into_view_if_needed(timeout=3000)
+        el.click()
+        page.wait_for_timeout(150)
+        # Clear any prior text
+        el.fill("")
+        page.wait_for_timeout(50)
+        # Type the answer slowly enough for React-Select to filter
+        el.type(answer, delay=15)
+        page.wait_for_timeout(300)
+        # Pick the top filtered option
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(150)
+        log.append(f"  picked {field_name}: {answer[:60]}")
+        return True
+    except Exception as e:
+        log.append(f"  combobox err {field_name}: {str(e)[:100]}")
+        return False
+
+
+def _apply_answers(page, entry: dict, log: list[str]) -> int:
+    """Apply queue/{slug}/answers.json to React-Select fields. Returns count picked."""
+    answers_path = entry["folder"] / "answers.json"
+    if not answers_path.exists():
+        log.append("  no answers.json")
+        return 0
+    try:
+        import json as _json
+        answers = _json.loads(answers_path.read_text())
+    except Exception:
+        return 0
+    picked = 0
+    for field_name, info in answers.items():
+        ans = (info.get("answer") or "").strip()
+        if not ans:
+            continue
+        ftype = info.get("type", "")
+        if ftype == "multi_value_single_select":
+            if _click_react_select(page, field_name, ans, log):
+                picked += 1
+        elif ftype in ("input_text", "textarea"):
+            sel = f"input#{field_name}, textarea#{field_name}"
+            if _safe_fill(page, sel, ans, log):
+                picked += 1
+    return picked
+
+
 def _fill_greenhouse(page, entry: dict, resume) -> None:
     """Greenhouse hosted application form prefill."""
+    log: list[str] = []
     page.goto(entry["url"], wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(1500)
+    # Wait for the form to actually appear — Greenhouse posting pages render the
+    # form below the JD. If first_name input isn't there after 20s, the page
+    # uses a different layout (e.g. requires clicking "Apply" first).
+    try:
+        page.wait_for_selector("input#first_name", timeout=20000)
+    except Exception:
+        # Try clicking an "Apply" button to expand the form
+        log.append("first_name not visible; looking for Apply button")
+        for sel in [
+            "a:has-text('Apply')",
+            "button:has-text('Apply')",
+            "a[href*='#app']",
+            "a[href*='apply']",
+        ]:
+            try:
+                btn = page.query_selector(sel)
+                if btn:
+                    btn.click()
+                    log.append(f"  clicked {sel}")
+                    page.wait_for_selector("input#first_name", timeout=15000)
+                    break
+            except Exception:
+                continue
 
+    page.wait_for_timeout(800)
     meta = resume["meta"]
     first, *rest = (meta.get("name") or "").split(" ", 1)
     last = rest[0] if rest else ""
@@ -101,41 +245,31 @@ def _fill_greenhouse(page, entry: dict, resume) -> None:
         ("input#phone", meta.get("phone", "")),
         ("input[name='job_application[phone]']", meta.get("phone", "")),
     ]:
-        try:
-            el = page.query_selector(sel)
-            if el and val:
-                el.fill(val)
-        except Exception:
-            pass
+        _safe_fill(page, sel, val, log)
 
-    # Resume file upload
-    for sel in ["input[type='file'][name*='resume']", "input#resume", "input[type='file']"]:
-        try:
-            el = page.query_selector(sel)
-            if el:
-                el.set_input_files(str(entry["resume_pdf"]))
-                break
-        except Exception:
-            continue
+    # Resume file upload — explicit IDs first, then catch-all
+    for sel in ["input#resume", "input[type='file'][name*='resume']", "input[type='file']"]:
+        if _safe_upload(page, sel, str(entry["resume_pdf"]), log):
+            break
 
-    # Cover letter — file OR textarea
     cover_text = entry["cover_md"].read_text() if entry["cover_md"].exists() else ""
-    for sel in ["input[type='file'][name*='cover']", "input#cover_letter"]:
-        try:
-            el = page.query_selector(sel)
-            if el:
-                el.set_input_files(str(entry["cover_pdf"]))
+    # Cover letter — try file upload first, then textarea fallback
+    uploaded_cover = False
+    for sel in ["input#cover_letter", "input[type='file'][name*='cover']"]:
+        if _safe_upload(page, sel, str(entry["cover_pdf"]), log):
+            uploaded_cover = True
+            break
+    if not uploaded_cover:
+        for sel in ["textarea#cover_letter-text", "textarea[name*='cover']"]:
+            if _safe_fill(page, sel, cover_text, log):
                 break
-        except Exception:
-            continue
-    for sel in ["textarea[name*='cover']", "textarea#cover_letter_text"]:
-        try:
-            el = page.query_selector(sel)
-            if el and cover_text:
-                el.fill(cover_text)
-                break
-        except Exception:
-            continue
+
+    # Custom Greenhouse questions: React-Select comboboxes + free-text fields.
+    # Source of truth = queue/{slug}/answers.json, drafted by answer_drafter.py.
+    picked = _apply_answers(page, entry, log)
+    log.append(f"  custom questions picked: {picked}")
+
+    console.print("[dim]" + "\n".join(log) + "[/dim]")
 
 
 def _fill_lever(page, entry: dict, resume) -> None:
@@ -267,17 +401,34 @@ def _prefill_one(entry: dict, resume, hold_seconds: int) -> str:
     if not handler:
         return f"manual:no_handler({hit.name})"
 
+    console.print(f"[yellow]opening[/yellow] {entry['url']}")
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
+        # Headed + larger viewport + slow_mo so user can see what's happening
+        browser = p.chromium.launch(headless=False, slow_mo=200)
+        context = browser.new_context(viewport={"width": 1400, "height": 900})
         page = context.new_page()
         try:
             handler(page, entry, resume)
+            # Scroll to the resume upload area so user lands oriented to the form
+            try:
+                el = page.query_selector("input#resume, input[name*='resume']")
+                if el:
+                    el.scroll_into_view_if_needed(timeout=5000)
+            except Exception:
+                pass
             console.print(
                 f"[bold green]READY[/bold green] {entry['company']} :: {hit.name}\n"
-                f"  -> Review form, click SUBMIT, then close browser.\n"
-                f"  -> Browser will auto-close in {hold_seconds}s if not closed."
+                f"  -> Review form in browser, FIX anything wrong, click SUBMIT, then close tab.\n"
+                f"  -> Script waits up to {hold_seconds}s before auto-closing."
             )
+            # Save screenshot for diagnostic
+            try:
+                shot = entry["folder"] / "form-state.png"
+                page.screenshot(path=str(shot), full_page=False)
+                console.print(f"  -> screenshot: {shot.relative_to(config.ROOT)}")
+            except Exception as e:
+                console.log(f"  screenshot failed: {e}")
             try:
                 page.wait_for_event("close", timeout=hold_seconds * 1000)
             except Exception:
