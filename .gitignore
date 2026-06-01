@@ -57,3 +57,5 @@ logs/
 # Third-party tools (cloned, not part of this repo)
 tools/
 
+
+.claude/scheduled_tasks.lock

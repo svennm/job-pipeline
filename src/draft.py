@@ -46,14 +46,23 @@ Description:
 SCORE ANALYSIS:
 {score_json}
 
+CANDIDATE POSITIONING (critical — override any default resume structure):
+The candidate runs a LIVE algorithmic-trading desk: production MT5↔Nautilus
+execution bridge on a $100K prop-firm account, custom MCP servers exposing
+broker state to LLM agents across 4 broker accounts, MT5 ported to Apple
+Silicon via Hangover Wine, 1000+ commits across 9 repos in 2026. This LIVE
+INFRA is the strongest signal. Credentials (UNT, Fidelity, Africa Lease) are
+support, not lead. Most candidates can't show working production systems;
+this one can. Resume must showcase the systems.
+
 TASK:
 Produce a tailored resume in Markdown that:
 1. Uses the candidate's REAL bullets — never fabricate experience, projects, or numbers
-2. Picks the 3-5 most relevant bullets per role for THIS posting (the YAML may have more)
-3. Reorders sections so the strongest fit appears first
-4. Uses the headline from resume.headline_by_category[{category}] if set, else resume.headline
-5. Lists 6-10 most relevant skills inline (trim irrelevant ones)
-6. Keeps to ~1 page when rendered (target ~600 words total)
+2. PROJECTS section appears EARLY (after headline + name) — the live infra IS the strongest credential. Put 3-4 most relevant projects here with concrete artifacts (414 commits, 4 MCP servers, 49 tool endpoints, etc.)
+3. Experience after projects. Pick the 3-5 most relevant bullets per role for THIS posting
+4. Headline = resume.headline_by_category[{category}] if set, else resume.headline
+5. 6-10 most relevant skills inline; trim irrelevant ones
+6. Keep to ~1 page when rendered (target ~600 words total)
 7. Output FORMAT: clean Markdown, no fenced code blocks around it, no preamble
 
 Begin output with the candidate's name as # H1."""
@@ -74,15 +83,28 @@ Description:
 SCORE ANALYSIS:
 {score_json}
 
+POSITIONING (critical):
+The candidate runs a LIVE algorithmic-trading desk. Lead with the SYSTEM, not
+the CV. Most cover letters lead with "I'm passionate about X" or credentials.
+This candidate leads with: "Here's what I run in production right now." The
+MT5↔Nautilus bridge, the MCP servers across 4 broker accounts, the Apple
+Silicon Wine port, the 1000-commit year. These are unusual — use them as the
+opening artifact, not as a footnote.
+
 TASK:
 Write a cover letter that:
-1. Opens with a SPECIFIC hook tied to this company / posting — never generic
-2. Names 2-3 concrete things from the candidate's resume that map to top JD requirements
-3. Uses the category pitch from resume.narrative.category_pitches[{category}] as raw material — adapt it, don't paste it
-4. Mentions language fit if relevant (French for African / French companies)
-5. Closes with a clear next step
-6. Target {words} words. NO em-dashes. NO "I'm thrilled / I'm excited" openings.
-7. Output FORMAT: clean Markdown — name and contact at top, then "Dear Hiring Team," then body, then sign-off. No preamble outside the letter."""
+1. Opens with a CONCRETE artifact from the candidate's live infra that's
+   relevant to this posting — never generic, never "I'm excited / thrilled".
+   Example: "I run a Nautilus Trader execution bridge on a $100K E8 prop
+   account — magic-tagged routing, OCO brackets, MFE/MAE journaling. The
+   bridge fills a known gap in the Nautilus ecosystem."
+2. Connects 2-3 specific things from the live infra to top JD requirements
+3. Notes language fit if relevant (French for African / French companies)
+4. Closes with a concrete next step (review the GitHub repos, schedule a call)
+5. Target {words} words. NO em-dashes. NO "I'm thrilled / I'm excited /
+   I'm passionate" openings. No filler. Numbers and artifacts only.
+6. Output FORMAT: clean Markdown — name and contact at top, then "Dear
+   Hiring Team," then body, then sign-off. No preamble outside the letter."""
 
 
 def _slug(s: str) -> str:
@@ -132,7 +154,8 @@ def draft_one(resume_yaml: str, row: pd.Series, cover_words: int) -> tuple[str, 
 @click.option("--input", "input_path", default=None, help="Override scored parquet path.")
 @click.option("--top", default=None, type=int, help="Override draft_top_n.")
 @click.option("--dry-run", is_flag=True, help="Print plan, don't call API.")
-def main(input_path: str | None, top: int | None, dry_run: bool) -> None:
+@click.option("--force", is_flag=True, help="Re-draft even if resume.md/cover_letter.md exist.")
+def main(input_path: str | None, top: int | None, dry_run: bool, force: bool) -> None:
     config.load_env()
     cfg = config.load_config()
     dcfg = cfg["draft"]
@@ -193,7 +216,7 @@ def main(input_path: str | None, top: int | None, dry_run: bool) -> None:
             "recommended_template": row.get("recommended_template"),
         }, indent=2, default=str))
 
-        if (folder / "resume.md").exists() and (folder / "cover_letter.md").exists():
+        if not force and (folder / "resume.md").exists() and (folder / "cover_letter.md").exists():
             console.log(f"[dim]exists [/dim] {slug}")
             continue
         pending.append((slug, folder, row))

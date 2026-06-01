@@ -62,30 +62,63 @@ def _title_score(title: str) -> int:
     return 0
 
 
-GLOBAL_OK = re.compile(
-    r"\b(remote|london|paris|amsterdam|berlin|dublin|dubai|singapore|tokyo|"
-    r"hong kong|prague|frankfurt|zurich|geneva|milan|madrid|brussels|warsaw|"
-    r"limassol|cyprus|malta|taipei|toronto|sydney|lagos|lomé|abidjan|dakar|"
-    r"casablanca|cairo|johannesburg|portugal|lisbon|europe|asia|americas|"
-    r"emea|apac|globally)\b",
+# Visa-friendly tier (Togolese passport): full credit + bonus.
+# See memory: project_job_search_frame.md.
+GEO_TIER_TOP = re.compile(
+    r"\b(dubai|united arab emirates|uae|mauritius|kigali|rwanda|lisbon|portugal|"
+    r"remote.{0,40}(?:crypto|defi|global)|crypto.{0,40}remote|defi.{0,40}remote)\b",
     re.I,
 )
-US_TAIL = re.compile(r",\s*(?:NY|CA|TX|IL|MA|FL|WA|CO|NJ|GA|VA|MD|OH|PA|NC|TN|IN|MI|MO|AZ|NV|OR|MN|WI|CT|DC|UT|KY|SC|LA|AL|AR|KS|NE|IA|OK|MS|HI|ID|MT|ME|NH|RI|VT|WV|WY|SD|ND|AK|DE|NM)\b")
+# Generally OK — EU / SG / HK / Africa / general remote
+GEO_TIER_OK = re.compile(
+    r"\b(remote|london|paris|amsterdam|berlin|dublin|singapore|tokyo|hong kong|"
+    r"prague|frankfurt|zurich|geneva|milan|madrid|brussels|warsaw|limassol|"
+    r"cyprus|malta|taipei|toronto|sydney|lagos|lomé|abidjan|dakar|casablanca|"
+    r"cairo|johannesburg|europe|asia|americas|emea|apac|globally)\b",
+    re.I,
+)
+US_TAIL = re.compile(
+    r",\s*(?:NY|CA|TX|IL|MA|FL|WA|CO|NJ|GA|VA|MD|OH|PA|NC|TN|IN|MI|MO|AZ|NV|OR|"
+    r"MN|WI|CT|DC|UT|KY|SC|LA|AL|AR|KS|NE|IA|OK|MS|HI|ID|MT|ME|NH|RI|VT|WV|WY|"
+    r"SD|ND|AK|DE|NM)\b"
+)
 US_FULL = re.compile(r"united states\b", re.I)
 
 
 def _location_score(location: str, is_remote: bool = False) -> int:
+    loc = location or ""
+    # Top-tier visa-friendly hits get a boost (over the 20 max)
+    if GEO_TIER_TOP.search(loc):
+        return 25
     if is_remote:
         return 20
-    if not location:
-        return 10  # unknown = neutral
-    if GLOBAL_OK.search(location):
-        return 20
-    if US_FULL.search(location) and not GLOBAL_OK.search(location):
-        return 5
-    if US_TAIL.search(location):
-        return 5
+    if not loc:
+        return 10
+    if GEO_TIER_OK.search(loc):
+        return 18
+    if US_FULL.search(loc) and not GEO_TIER_OK.search(loc):
+        return 3   # US-only: harsh penalty
+    if US_TAIL.search(loc):
+        return 3
     return 10
+
+
+# Companies known to be credential-gated (Citadel/JS/Optiver/etc) — discount
+# heavily even if title matches. Per user frame: don't waste cycles on walls.
+TIER1_GATED = re.compile(
+    r"\b(citadel|jane street|optiver|imc trading|jump trading|hudson river|"
+    r"two sigma|d\.?e\.? shaw|de shaw|aqr|bridgewater|susquehanna|sig\b|"
+    r"jpmorgan|goldman sachs|morgan stanley|bofa|bank of america)\b",
+    re.I,
+)
+
+
+def _credential_gated_penalty(company: str) -> int:
+    if not company:
+        return 0
+    if TIER1_GATED.search(company):
+        return -20
+    return 0
 
 
 STACK_KW = re.compile(
@@ -144,9 +177,9 @@ def score_row(row: pd.Series, seed_map: dict[str, str]) -> dict:
     loc_s = _location_score(loc, is_remote)
     stack_s = _stack_score(desc)
     rel_s = _relevance_score(desc)
-    total = comp + title_s + loc_s + stack_s + rel_s
+    penalty = _credential_gated_penalty(company)
+    total = max(0, comp + title_s + loc_s + stack_s + rel_s + penalty)
 
-    # Build verdict
     if total >= 70:
         verdict = "strong_fit"
     elif total >= 55:
@@ -165,6 +198,7 @@ def score_row(row: pd.Series, seed_map: dict[str, str]) -> dict:
             "location": loc_s,
             "stack": stack_s,
             "relevance": rel_s,
+            "credential_gate_penalty": penalty,
         },
     }
 

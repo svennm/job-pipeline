@@ -139,19 +139,26 @@ def _fill_greenhouse(page, entry: dict, resume) -> None:
 
 
 def _fill_lever(page, entry: dict, resume) -> None:
-    page.goto(entry["url"], wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(1500)
+    # Lever apply form lives at /apply suffix. Posting view URL won't have form.
+    url = entry["url"]
+    if not url.rstrip("/").endswith("/apply"):
+        url = url.rstrip("/") + "/apply"
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_timeout(2000)
 
     meta = resume["meta"]
+    cover_text = entry["cover_md"].read_text() if entry["cover_md"].exists() else ""
 
     for sel, val in [
         ("input[name='name']", meta.get("name", "")),
         ("input[name='email']", meta.get("email", "")),
         ("input[name='phone']", meta.get("phone", "")),
         ("input[name='org']", "Independent / Self-directed"),
+        ("input[name='location']", meta.get("location", "")),
         ("input[name='urls[LinkedIn]']", meta.get("linkedin") or ""),
         ("input[name='urls[GitHub]']", meta.get("github") or ""),
-        ("textarea[name='comments']", (entry["cover_md"].read_text() if entry["cover_md"].exists() else "")),
+        ("input[name='urls[Portfolio]']", meta.get("github") or ""),
+        ("textarea[name='comments']", cover_text),
     ]:
         try:
             el = page.query_selector(sel)
@@ -160,7 +167,8 @@ def _fill_lever(page, entry: dict, resume) -> None:
         except Exception:
             pass
 
-    for sel in ["input[name='resume']", "input[type='file']"]:
+    # Resume upload — Lever uses #resume-upload-input or name="resume"
+    for sel in ["#resume-upload-input", "input[name='resume']", "input[type='file']"]:
         try:
             el = page.query_selector(sel)
             if el:
@@ -168,6 +176,7 @@ def _fill_lever(page, entry: dict, resume) -> None:
                 break
         except Exception:
             continue
+    # NOTE: Lever uses hCaptcha. User must solve it before submit.
 
 
 def _fill_ashby(page, entry: dict, resume) -> None:
