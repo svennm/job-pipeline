@@ -53,7 +53,7 @@ def scrape_one(
         location="",
         results_wanted=results_per_search,
         hours_old=hours_old,
-        country_indeed="USA",
+        country_indeed="United Kingdom",
         linkedin_fetch_description=True,
         verbose=0,
     )
@@ -116,14 +116,15 @@ def main(category: str | None, dry_run: bool) -> None:
     raw = pd.concat(frames, ignore_index=True)
     before = len(raw)
 
-    raw["_loc_ok"] = raw["location"].apply(
-        lambda x: _location_passes(x, filt.get("allow_locations", []), filt.get("deny_locations", []))
-    )
+    # Soft-filter: JD-keyword bans only (catches "US citizens only" etc).
+    # Location is NOT hard-filtered here — LLM scorer judges geo/visa fit per posting
+    # via the `risks` field. Hard pre-filtering kills too much (LinkedIn geo-biases
+    # to US, miscategorizes remote-global roles, etc).
     raw["_jd_ok"] = raw["description"].apply(
         lambda x: _jd_passes(x, filt.get("deny_keywords_in_jd", []))
     )
-    out = raw[raw["_loc_ok"] & raw["_jd_ok"]].copy()
-    out = out.drop(columns=["_loc_ok", "_jd_ok"])
+    out = raw[raw["_jd_ok"]].copy()
+    out = out.drop(columns=["_jd_ok"])
     out = out.drop_duplicates(subset=["job_url"], keep="first")
 
     after = len(out)

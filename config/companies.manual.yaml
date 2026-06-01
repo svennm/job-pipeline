@@ -1,0 +1,28 @@
+# Manually-verified ATS slugs for companies the auto-probe missed.
+# Format matches companies.yaml. Probe does NOT overwrite this file.
+# Merged with companies.yaml by ats_direct.py via the merge step.
+
+# --- Verified hits ---
+GSR:
+  category: crypto_mm
+  hq: London, UK
+  slugs:
+    greenhouse: gsrmarkets
+
+N26:
+  category: fintech_generalist
+  hq: Berlin / Remote
+  slugs:
+    greenhouse: n26
+
+# --- TODO: companies on custom careers pages (no standard ATS) ---
+# These need Playwright on their custom URL OR email outreach.
+# Wintermute        — wintermute.com/careers (custom)
+# Flowdesk          — flowdesk.co (custom)
+# dYdX              — dydx.foundation (custom)
+# MetaQuotes        — metaquotes.net (custom)
+# Pepperstone       — pepperstone.com/careers (workday or custom)
+# TradingView       — tradingview.com/about/careers (custom)
+# Spotware/cTrader  — spotware.com (custom)
+# Brokeree          — brokeree.com (email outreach)
+# Hyperliquid       — minimal team, no formal careers page

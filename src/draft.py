@@ -1,30 +1,32 @@
 """Draft tailored resume.md + cover_letter.md per top-N scored posting.
 
 Input:  data/scored-{YYYYMMDD}.parquet (latest)
-Output: queue/{YYYYMMDD}-{score}-{company-slug}/
+Output: queue/{YYYYMMDD}-{score}-{company-slug}-{url_hash}/
           ├── posting.md         (JD + metadata)
           ├── score.json         (fit analysis from score step)
           ├── resume.md          (tailored)
           └── cover_letter.md    (tailored)
 
-Markdown only — PDF conversion left to user / external tool (weasyprint, pandoc).
+The url_hash suffix (first 6 chars of sha256(job_url)) prevents folder collisions
+when one company has multiple postings with the same fit_score.
+
+Markdown only — render.py converts to PDF in a separate step.
 """
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
-import os
 import re
 from pathlib import Path
 
 import click
 import pandas as pd
 import yaml
-from anthropic import Anthropic
 from rich.console import Console
 from rich.progress import track
 
-from . import config
+from . import config, llm
 
 console = Console()
 
@@ -99,13 +101,7 @@ def _format_jd(row: pd.Series, max_chars: int = 4000) -> str:
     return (row.get("description") or "")[:max_chars]
 
 
-def draft_one(
-    client: Anthropic,
-    model: str,
-    resume_yaml: str,
-    row: pd.Series,
-    cover_words: int,
-) -> tuple[str, str]:
+def _build_kwargs(resume_yaml: str, row: pd.Series) -> dict:
     score_summary = {
         "fit_score": int(row.get("fit_score") or 0),
         "verdict": row.get("verdict"),
@@ -114,33 +110,21 @@ def draft_one(
         "risks": row.get("risks"),
         "top_requirements": row.get("top_requirements"),
     }
-    score_json = json.dumps(score_summary, indent=2, default=str)
-    desc = _format_jd(row)
-
-    base_kwargs = dict(
+    return dict(
         resume_yaml=resume_yaml,
         title=row.get("title", ""),
         company=row.get("company", ""),
         location=row.get("location", ""),
         category=row.get("category", "fintech_generalist"),
-        description=desc,
-        score_json=score_json,
+        description=_format_jd(row),
+        score_json=json.dumps(score_summary, indent=2, default=str),
     )
 
-    resume_resp = client.messages.create(
-        model=model,
-        max_tokens=1800,
-        messages=[{"role": "user", "content": RESUME_PROMPT.format(**base_kwargs)}],
-    )
-    resume_md = resume_resp.content[0].text.strip()
 
-    cover_resp = client.messages.create(
-        model=model,
-        max_tokens=900,
-        messages=[{"role": "user", "content": COVER_PROMPT.format(words=cover_words, **base_kwargs)}],
-    )
-    cover_md = cover_resp.content[0].text.strip()
-
+def draft_one(resume_yaml: str, row: pd.Series, cover_words: int) -> tuple[str, str]:
+    base = _build_kwargs(resume_yaml, row)
+    resume_md = llm.call(RESUME_PROMPT.format(**base)).strip()
+    cover_md = llm.call(COVER_PROMPT.format(words=cover_words, **base)).strip()
     return resume_md, cover_md
 
 
@@ -172,9 +156,6 @@ def main(input_path: str | None, top: int | None, dry_run: bool) -> None:
             )
         return
 
-    api_key = config.require_env("ANTHROPIC_API_KEY")
-    model = os.environ.get("CLAUDE_MODEL") or dcfg["model"]
-    client = Anthropic(api_key=api_key)
     resume = config.load_resume()
     resume_yaml = yaml.safe_dump(resume, sort_keys=False)
     cover_words = dcfg.get("cover_letter_words", 250)
@@ -183,10 +164,13 @@ def main(input_path: str | None, top: int | None, dry_run: bool) -> None:
     out_root.mkdir(parents=True, exist_ok=True)
     stamp = dt.date.today().strftime("%Y%m%d")
 
-    for _, row in track(df.iterrows(), total=len(df), description="drafting"):
+    # First pass: write posting.md + score.json, identify which folders need drafting.
+    pending: list[tuple[str, Path, pd.Series]] = []
+    for _, row in df.iterrows():
         fit = int(row.get("fit_score") or 0)
         company = row.get("company") or "unknown"
-        slug = f"{stamp}-{fit:03d}-{_slug(company)}"
+        url_hash = hashlib.sha256((row.get("job_url") or "").encode()).hexdigest()[:6]
+        slug = f"{stamp}-{fit:03d}-{_slug(company)}-{url_hash}"
         folder = out_root / slug
         folder.mkdir(parents=True, exist_ok=True)
 
@@ -209,14 +193,42 @@ def main(input_path: str | None, top: int | None, dry_run: bool) -> None:
             "recommended_template": row.get("recommended_template"),
         }, indent=2, default=str))
 
-        try:
-            resume_md, cover_md = draft_one(client, model, resume_yaml, row, cover_words)
-        except Exception as e:
-            console.log(f"[red]error[/red] {company}: {e}")
+        if (folder / "resume.md").exists() and (folder / "cover_letter.md").exists():
+            console.log(f"[dim]exists [/dim] {slug}")
             continue
+        pending.append((slug, folder, row))
 
-        (folder / "resume.md").write_text(resume_md)
-        (folder / "cover_letter.md").write_text(cover_md)
+    if not pending:
+        console.print(f"[bold green]all drafted[/bold green] -> {out_root}")
+        return
+
+    # Build parallel prompt batches: resumes + cover letters.
+    resume_prompts: list[tuple[str, str]] = []
+    cover_prompts: list[tuple[str, str]] = []
+    for slug, _, row in pending:
+        base = _build_kwargs(resume_yaml, row)
+        resume_prompts.append((slug, RESUME_PROMPT.format(**base)))
+        cover_prompts.append((slug, COVER_PROMPT.format(words=cover_words, **base)))
+
+    console.log(f"drafting {len(pending)} (parallel resume + cover passes)")
+
+    def _prog(label: str):
+        def cb(done: int, total: int) -> None:
+            if done % 3 == 0 or done == total:
+                console.log(f"  [dim]{label}[/dim] {done}/{total}")
+        return cb
+
+    resume_results = llm.call_many(resume_prompts, progress=_prog("resume"))
+    cover_results = llm.call_many(cover_prompts, progress=_prog("cover"))
+
+    for slug, folder, _ in pending:
+        rm = resume_results.get(slug, "")
+        cv = cover_results.get(slug, "")
+        if rm.startswith("__ERROR__") or cv.startswith("__ERROR__"):
+            console.log(f"[red]error[/red] {slug}: resume={rm[:80]} cover={cv[:80]}")
+            continue
+        (folder / "resume.md").write_text(rm.strip())
+        (folder / "cover_letter.md").write_text(cv.strip())
         console.log(f"[green]drafted[/green] {slug}")
 
     console.print(f"[bold green]done[/bold green] -> {out_root}")

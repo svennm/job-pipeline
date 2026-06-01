@@ -1,50 +1,78 @@
 # Copy to config/config.yaml. Secrets live in .env, not here.
 
 scrape:
-  sites: [linkedin, indeed, glassdoor, google, zip_recruiter]
+  # Sites: linkedin/indeed/glassdoor/google/zip_recruiter
+  # We scrape LinkedIn/Indeed but NEVER auto-submit there (ban risk).
+  # Greenhouse/Lever/Ashby URLs pulled from those scrapes are eligible for auto-submit.
+  sites: [linkedin, indeed, glassdoor, google]
+
   # Search terms per target category. Pipeline runs one search per term.
+  # FX-tilted: emphasize FX/microstructure/MT5/MQL5/Nautilus + crypto-MM.
   searches:
     crypto_mm:
       - "crypto market maker engineer"
-      - "trading systems engineer crypto"
-      - "quant developer crypto"
+      - "trading systems engineer crypto FX"
+      - "quant developer crypto perpetuals"
+      - "low latency engineer crypto trading"
+      - "execution engineer digital assets"
     broker_tech:
-      - "MT5 developer"
-      - "MetaTrader broker engineer"
+      - "MetaTrader 5 developer"
+      - "MT5 plugin developer"
+      - "MQL5 expert advisor developer"
       - "FX broker software engineer"
+      - "cTrader developer"
+      - "FX bridge engineer"
+      - "FX aggregation engineer"
     eu_prop:
-      - "prop trading software engineer remote"
-      - "quant developer prop firm"
+      - "FX prop trading software engineer"
+      - "prop firm quant developer remote"
+      - "FX execution algorithm engineer"
+      - "trading desk software engineer FX"
     africa_treasury:
       - "FX treasury analyst Africa"
       - "treasury analyst francophone"
+      - "FX trader West Africa"
+      - "treasury XOF analyst"
     fintech_generalist:
-      - "trading platform backend engineer"
-      - "fintech python engineer remote"
+      - "FX trading platform backend engineer"
+      - "FX market data engineer"
+      - "spot FX systems engineer"
+      - "FX e-trading engineer"
 
-  # Filtering after scrape — postings must pass ALL.
   filters:
-    # Allowed location keywords (case-insensitive substring match on JD location).
-    # Empty list = no location filter.
     allow_locations:
       - remote
       - london
+      - united kingdom
       - paris
+      - france
       - amsterdam
+      - netherlands
       - berlin
+      - germany
+      - frankfurt
       - dublin
+      - ireland
       - lisbon
+      - portugal
       - madrid
+      - spain
       - milan
+      - italy
       - zurich
+      - switzerland
       - geneva
       - prague
+      - czech
       - warsaw
+      - poland
       - bucharest
       - sofia
       - cyprus
       - limassol
+      - malta
       - dubai
+      - united arab emirates
       - abu dhabi
       - singapore
       - hong kong
@@ -54,39 +82,56 @@ scrape:
       - lagos
       - nairobi
       - lomé
+      - togo
       - abidjan
+      - cote d'ivoire
       - dakar
+      - senegal
       - casablanca
-    # Block these — usually US-only with visa restrictions.
+      - morocco
     deny_locations:
       - "united states only"
       - "us citizens only"
       - "us only"
-    # Min/max posting age in days.
+      - "must reside in us"
     max_age_days: 14
-    # Soft block — keywords that strongly indicate US-only roles.
     deny_keywords_in_jd:
       - "must be us citizen"
       - "us work authorization required"
       - "no visa sponsorship"
+      - "active security clearance"
 
   results_per_search: 25
   hours_old: 336  # 14 days
 
-score:
+llm:
+  # Backend: "claude_cli" (uses your Claude Code subscription, no API key) or
+  # "anthropic_sdk" (needs ANTHROPIC_API_KEY in .env). claude_cli is the default
+  # because it works with a standard Claude Code subscription.
+  backend: "claude_cli"
   model: "claude-sonnet-4-6"
-  # Top-N to draft per pipeline run.
+  max_tokens: 2000
+  timeout: 180
+  workers: 4
+
+score:
+  model: "claude-sonnet-4-6"   # superseded by llm.model
   draft_top_n: 15
-  # Minimum fit score (0-100) to include.
   min_score: 60
 
 draft:
   model: "claude-sonnet-4-6"
   output_dir: "queue"
-  # Resume length target (bullets per role).
   bullets_per_role_target: 4
-  # Cover letter length target (words).
   cover_letter_words: 250
+
+submit:
+  # Only direct-API submissions to these ATSes. Everything else -> manual_review/.
+  enabled_ats: [greenhouse, lever, ashby]
+  # ALL real sends require --confirm flag on CLI. Default is dry-run.
+  default_dry_run: true
+  # Stop the batch if N consecutive failures.
+  max_consecutive_failures: 3
 
 tracker:
   csv_path: "tracker/live.csv"

@@ -1,0 +1,118 @@
+Alpaca:
+  category: fintech_generalist
+  hq: San Francisco / Remote
+  slugs:
+    greenhouse: alpaca
+Amber Group:
+  category: crypto_mm
+  hq: Singapore / Remote
+  slugs:
+    ashby: amber
+Anchorage Digital:
+  category: fintech_generalist
+  hq: SF / Remote
+  slugs:
+    lever: anchorage
+Apex Trader Funding:
+  category: eu_prop
+  hq: Austin TX / Remote
+  slugs:
+    greenhouse: apex
+B2C2:
+  category: crypto_mm
+  hq: London, UK
+  slugs:
+    greenhouse: b2c2
+Brex:
+  category: fintech_generalist
+  hq: SF / Remote
+  slugs:
+    greenhouse: brex
+Databento:
+  category: fintech_generalist
+  hq: Remote
+  slugs:
+    greenhouse: databento
+FTMO:
+  category: eu_prop
+  hq: Prague, Czech Republic
+  slugs:
+    ashby: ftmo
+Flow Traders:
+  category: eu_prop
+  hq: Amsterdam, Netherlands
+  slugs:
+    greenhouse: flowtraders
+Galaxy Digital:
+  category: crypto_mm
+  hq: New York / Remote
+  slugs:
+    greenhouse: galaxy
+IEX Cloud (now Cybertrade):
+  category: fintech_generalist
+  hq: NY
+  slugs:
+    greenhouse: iex
+ION Group:
+  category: fintech_generalist
+  hq: London / Remote
+  slugs:
+    lever: ion
+Keyrock:
+  category: crypto_mm
+  hq: Brussels, Belgium
+  slugs:
+    ashby: keyrock
+Kronos Research:
+  category: crypto_mm
+  hq: Taipei, Taiwan
+  slugs:
+    greenhouse: kronosresearch
+Maven Securities:
+  category: fintech_generalist
+  hq: London / Remote
+  slugs:
+    ashby: maven
+Mercury:
+  category: fintech_generalist
+  hq: SF / Remote
+  slugs:
+    ashby: mercury
+    greenhouse: mercury
+MyFundedFutures:
+  category: eu_prop
+  hq: Remote
+  slugs:
+    greenhouse: myfundedfutures
+N26:
+  category: fintech_generalist
+  hq: Berlin / Remote
+  slugs:
+    greenhouse: n26
+Nansen:
+  category: fintech_generalist
+  hq: Singapore / Remote
+  slugs:
+    greenhouse: nansen
+Paradigm:
+  category: crypto_mm
+  hq: Singapore / Remote
+  slugs:
+    ashby: paradigm
+    greenhouse: paradigm
+Plaid:
+  category: fintech_generalist
+  hq: SF / Remote
+  slugs:
+    ashby: plaid
+    lever: plaid
+Robinhood:
+  category: fintech_generalist
+  hq: Menlo Park / Remote
+  slugs:
+    greenhouse: robinhood
+Stripe:
+  category: fintech_generalist
+  hq: SF / Remote
+  slugs:
+    greenhouse: stripe

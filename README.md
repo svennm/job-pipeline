@@ -13,12 +13,25 @@ Quant/crypto-MM/EU-prop/Francophone-Africa targets don't post on bulk-apply boar
 ## Architecture
 
 ```
-src/scrape/  JobSpy → filter (remote, EU/UK/SG/Dubai, exclude US-only) → normalized parquet
-src/score/   Claude API: rank JD vs resume.yaml against 5 target categories
-src/draft/   Top-N hits → tailored resume.pdf + cover_letter.md → queue/{company}-{date}/
-queue/       Ready-to-review drafts (gitignored)
-tracker/     application_tracker.csv mirrors the Google Sheet (gitignored when live)
-resume/      resume.template.yaml (public structure), resume/private/ (real PII, gitignored)
+src/sources/ats_direct.py  Pull jobs straight from Greenhouse/Lever/Ashby APIs
+                           for known seed-company slugs. Highest signal.
+src/scrape.py              JobSpy fallback: LinkedIn/Indeed/Glassdoor/Google
+                           keyword search (lower signal, no auto-submit URLs).
+scripts/filter_fx.py       Pre-filter raw -> FX-relevant titles only.
+src/score.py               Haiku scoring vs resume.yaml + per-category targets.
+src/draft.py               Sonnet drafts tailored resume + cover per top-N hit.
+src/render.py              Markdown -> PDF (WeasyPrint, Helvetica, 1-page).
+src/ats.py                 Detect ATS from URL (Greenhouse/Lever/Ashby/Workday/etc)
+src/submit.py              Playwright headed prefill — opens browser, fills form,
+                           USER clicks submit. No unattended submits.
+src/tracker.py             Append-from-queue + status mark CSV ops.
+
+config/companies.yaml       Auto-probed company -> ATS slug map (committed).
+config/companies.manual.yaml Hand-verified slugs for companies the probe missed.
+tracker/seed.csv            108-row target company list w/ priority/category.
+queue/                      Per-application folders (gitignored).
+resume/resume.template.yaml Public template; real resume in resume/private/.
+data/                       Raw + cached + scored parquet (gitignored).
 ```
 
 ## Target categories
@@ -28,24 +41,29 @@ resume/      resume.template.yaml (public structure), resume/private/ (real PII,
 ## Quickstart
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# 1. Copy template and fill in your data
+# One-time setup
+make install
 cp resume/resume.template.yaml resume/private/resume.yaml
-# (edit resume/private/resume.yaml with your real info)
-
-# 2. Configure
 cp config/config.example.yaml config/config.yaml
-# (set ANTHROPIC_API_KEY in environment)
+# edit resume/private/resume.yaml — real PII goes here, gitignored
 
-# 3. Run pipeline
-python -m src.scrape   # scrape postings → data/raw/
-python -m src.score    # score against resume → data/scored.parquet
-python -m src.draft    # draft top-N → queue/
+# Map your seed companies to their ATS slugs (one-time)
+make probe-slugs
 
-# 4. Review queue/ manually, submit, then update tracker
+# Pipeline (run anytime you want new applications)
+make full           # fetch + filter + score + draft + render + tracker-append
+
+# Review queue/ folders. Then:
+make submit-plan    # see what would be submitted
+make submit-confirm # opens headed browsers, fills forms, YOU click submit
 ```
+
+## LLM backend
+
+Default backend is **Claude Code CLI** (`claude -p`) — uses your Claude Code
+subscription, no separate API key needed. Score uses Haiku (fast), drafts use
+Sonnet (quality). Set `llm.backend: anthropic_sdk` in `config/config.yaml` to
+use the Anthropic SDK directly if you have an API key.
 
 ## Tracker
 

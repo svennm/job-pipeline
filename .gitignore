@@ -17,9 +17,11 @@ resume/*.private.yml
 # Generated application drafts (per-application output)
 queue/
 
-# Scraped raw outputs (may contain user-tagged URLs / cookies)
+# Scraped raw outputs and intermediates (job-board data + scoring results
+# contain user's job-search activity — keep private even on portfolio repo)
 data/raw/
 data/cache/
+data/*.parquet
 
 # Tracker — keep schema public, hide live state
 tracker/live.csv
