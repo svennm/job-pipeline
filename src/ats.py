@@ -32,7 +32,9 @@ ATS_PATTERNS: list[tuple[str, re.Pattern]] = [
 ]
 
 # ATSes we can prefill with Playwright. Others -> manual_review.
-SUPPORTED = {"greenhouse", "lever", "ashby", "workable"}
+# Workday: V1 only opens the JD + clicks Apply + waits; account creation +
+# multi-page wizard left to the user. Still saves time vs finding the posting.
+SUPPORTED = {"greenhouse", "lever", "ashby", "workable", "workday"}
 
 # ATSes that are ToS-risky for any automation (LinkedIn/Indeed/Glassdoor Easy Apply).
 BANNED = {"linkedin", "indeed", "glassdoor"}

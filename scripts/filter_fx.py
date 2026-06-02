@@ -19,9 +19,10 @@ console = Console()
 
 FX_KW = re.compile(
     r"\b(fx|forex|currenc|trading|trader|quant|electronic|emarket|e-market|spot|broker|"
-    r"exchange|venue|microstructure|liquidity|execution|matching|order book|"
-    r"market[- ]?making|market maker|risk|treasury|metatrader|mt5|mql5|ctrader|"
-    r"low latency|crypto|derivatives|derivative|perpetual|swap|nautilus|backtest)\b",
+    r"dealer|dealing|exchange|venue|microstructure|liquidity|execution|matching|"
+    r"order book|market[- ]?making|market maker|risk|treasury|metatrader|mt5|mql5|"
+    r"ctrader|cfd|low latency|crypto|derivatives|derivative|perpetual|swap|"
+    r"nautilus|backtest)\b",
     re.I,
 )
 NEG = re.compile(

@@ -209,12 +209,17 @@ def draft_one(folder: Path, resume: dict) -> dict[str, dict[str, Any]]:
         for q in needs_llm:
             f = q["fields"][0]
             name = f["name"]
-            ans = parsed.get(name) or ""
+            raw = parsed.get(name) or ""
+            # LLM sometimes returns lists (multi-pick) or dicts. Coerce to str.
+            if isinstance(raw, list):
+                raw = raw[0] if raw else ""
+            if not isinstance(raw, str):
+                raw = str(raw)
             answers[name] = {
                 "field_name": name,
                 "label": q["label"],
                 "type": f["type"],
-                "answer": ans.strip(),
+                "answer": raw.strip(),
                 "rationale": "llm_drafted",
             }
 

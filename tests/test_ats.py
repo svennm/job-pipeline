@@ -40,6 +40,7 @@ def test_supported_routes_to_prefill(name):
         "lever": "https://jobs.lever.co/co/abc",
         "ashby": "https://jobs.ashbyhq.com/co/1",
         "workable": "https://apply.workable.com/co/j/X",
+        "workday": "https://co.wd1.myworkdayjobs.com/Careers/job/xxx",
     }
     h = detect(urls[name])
     assert h.supported
@@ -59,8 +60,9 @@ def test_banned_routes_to_banned(name):
     assert h.route == "banned"
 
 
-def test_workday_routes_to_manual():
+def test_workday_routes_to_prefill():
+    """V1 Workday handler — opens posting + clicks Apply, stops at sign-in."""
     h = detect("https://co.wd1.myworkdayjobs.com/CitiCareers/job/xxx")
     assert h.name == "workday"
-    assert h.route == "manual"
-    assert not h.supported
+    assert h.route == "prefill"
+    assert h.supported

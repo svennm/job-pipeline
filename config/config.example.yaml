@@ -38,6 +38,17 @@ scrape:
       - "FX market data engineer"
       - "spot FX systems engineer"
       - "FX e-trading engineer"
+    broker_dealer:
+      - "FX Dealer"
+      - "CFD Dealer"
+      - "FX CFD Dealer"
+      - "Spot FX Dealer"
+      - "Senior FX Dealer"
+      - "Junior FX Dealer"
+      - "Dealing Desk"
+      - "FX Trader broker"
+      - "Treasury FX Dealer"
+      - "OTC FX Dealer"
 
   filters:
     allow_locations:

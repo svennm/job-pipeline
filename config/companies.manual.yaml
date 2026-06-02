@@ -26,3 +26,33 @@ N26:
 # Spotware/cTrader  — spotware.com (custom)
 # Brokeree          — brokeree.com (email outreach)
 # Hyperliquid       — minimal team, no formal careers page
+
+Convera:
+  category: broker_dealer
+  hq: London / Denver
+  slugs:
+    greenhouse: convera
+
+Ebury:
+  category: broker_dealer
+  hq: London / Madrid
+  slugs:
+    greenhouse: ebury
+
+DV Trading:
+  category: eu_prop
+  hq: Chicago / Toronto
+  slugs:
+    greenhouse: dvtrading
+
+Interactive Brokers:
+  category: broker_tech
+  hq: Greenwich CT / Remote
+  slugs:
+    greenhouse: ibkr
+
+Virtu Financial:
+  category: crypto_mm
+  hq: New York / Dublin
+  slugs:
+    greenhouse: virtu

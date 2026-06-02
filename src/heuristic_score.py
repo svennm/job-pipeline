@@ -39,6 +39,11 @@ def _priority_for_company(company: str, seed_map: dict[str, str]) -> int:
 
 TITLE_BUCKETS = [
     # (regex, points)
+    # Dealer roles — directly relevant to candidate's Africa Lease FX execution
+    (re.compile(r"\b(fx|cfd|spot fx)[- ]?dealer\b", re.I), 28),
+    (re.compile(r"\b(dealer|dealing desk)\b", re.I), 22),
+    (re.compile(r"\b(treasury (?:dealer|analyst|specialist))\b", re.I), 24),
+    (re.compile(r"\botc (?:trader|dealer)\b", re.I), 22),
     (re.compile(r"\b(trading systems? engineer|execution engineer)\b", re.I), 25),
     (re.compile(r"\b(quant(?:itative)? (?:developer|engineer|trader|researcher))\b", re.I), 22),
     (re.compile(r"\b(mt5|metatrader|mql5|ctrader)\b", re.I), 25),

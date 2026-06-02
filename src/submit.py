@@ -140,6 +140,18 @@ def _safe_upload(page, sel: str, path: str, log: list[str]) -> bool:
         return False
 
 
+def _selector_field(sel: str) -> str:
+    """Pull the bare field id from an input selector like input#foo or input[id=foo]."""
+    import re as _re
+    m = _re.search(r"#([\w\-]+)", sel)
+    if m:
+        return m.group(1)
+    m = _re.search(r"id=['\"]?([\w\-]+)", sel)
+    if m:
+        return m.group(1)
+    return ""
+
+
 def _click_react_select(page, field_name: str, answer: str, log: list[str]) -> bool:
     """Pick an option in a Greenhouse React-Select combobox by typing the answer.
 
@@ -232,8 +244,13 @@ def _fill_greenhouse(page, entry: dict, resume) -> None:
 
     page.wait_for_timeout(800)
     meta = resume["meta"]
-    first, *rest = (meta.get("name") or "").split(" ", 1)
-    last = rest[0] if rest else ""
+    # Prefer explicit first_name/last_name; fall back to splitting `name`.
+    first = meta.get("first_name") or ""
+    last = meta.get("last_name") or ""
+    if not first or not last:
+        parts = (meta.get("name") or "").split(" ", 1)
+        first = first or (parts[0] if parts else "")
+        last = last or (parts[1] if len(parts) > 1 else "")
 
     for sel, val in [
         ("input#first_name", first),
@@ -246,6 +263,25 @@ def _fill_greenhouse(page, entry: dict, resume) -> None:
         ("input[name='job_application[phone]']", meta.get("phone", "")),
     ]:
         _safe_fill(page, sel, val, log)
+
+    # Phone country code — Greenhouse renders this as a separate React-Select
+    # combobox right before the phone input. Common IDs/aria-labels include
+    # variants like "phone_country", "country_code", "phone-country-code". Try
+    # them all, falling back to a flag-search by country name.
+    country_code = meta.get("phone_country_code", "")
+    country_name = meta.get("phone_country", "")
+    if country_code or country_name:
+        cc_targets = [
+            ("input#phone_country", country_name or country_code),
+            ("input#phone_country_code", country_name or country_code),
+            ("input[aria-labelledby*='phone_country']", country_name or country_code),
+            ("input[id^='phone_country_']", country_name or country_code),
+            # Wrapper aria-label often includes 'Country' near phone field
+            ("input[role='combobox'][aria-label*='Country' i]", country_name or country_code),
+        ]
+        for sel, value in cc_targets:
+            if _click_react_select(page, _selector_field(sel), value, log):
+                break
 
     # Resume file upload — explicit IDs first, then catch-all
     for sel in ["input#resume", "input[type='file'][name*='resume']", "input[type='file']"]:
@@ -352,8 +388,8 @@ def _fill_workable(page, entry: dict, resume) -> None:
     page.wait_for_timeout(1500)
 
     meta = resume["meta"]
-    first, *rest = (meta.get("name") or "").split(" ", 1)
-    last = rest[0] if rest else ""
+    first = meta.get("first_name") or (meta.get("name") or "").split(" ", 1)[0]
+    last = meta.get("last_name") or ((meta.get("name") or "").split(" ", 1)[1] if " " in (meta.get("name") or "") else "")
 
     for sel, val in [
         ("input[name='firstname']", first),
@@ -379,11 +415,53 @@ def _fill_workable(page, entry: dict, resume) -> None:
             continue
 
 
+def _fill_workday(page, entry: dict, resume) -> None:
+    """Workday V1 — open posting, click Apply, stop for user to do account creation
+    and wizard manually. Workday's multi-page wizard varies per employer and
+    requires per-employer account; the wins are: no separate URL hunt, browser
+    already navigated to the right place, resume/cover PDFs already prepared.
+
+    TODO V2: handle the wizard pages (My Info / My Experience / Application
+    Questions / Voluntary Disclosures / Review).
+    """
+    log: list[str] = []
+    page.goto(entry["url"], wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_timeout(2000)
+
+    # Workday's "Apply" button is usually a button with data-automation-id or
+    # button text "Apply" / "Apply Now". Try several patterns.
+    for sel in [
+        "button[data-automation-id='applyManually']",
+        "a[data-automation-id='adventureButton']",
+        "button:has-text('Apply')",
+        "a:has-text('Apply Now')",
+        "a:has-text('Apply')",
+    ]:
+        try:
+            btn = page.query_selector(sel)
+            if btn and btn.is_visible():
+                btn.click()
+                log.append(f"  clicked {sel}")
+                page.wait_for_timeout(2500)
+                break
+        except Exception as e:
+            log.append(f"  err {sel}: {str(e)[:80]}")
+    else:
+        log.append("  no Apply button found")
+
+    # After Apply, Workday often shows a "Sign In or Create Account" page.
+    # The user needs to create an account (first time per employer) — we
+    # cannot automate that securely. So we stop here and let them continue.
+    log.append("  V1: stopping at sign-in / wizard for user")
+    console.print("[dim]" + "\n".join(log) + "[/dim]")
+
+
 HANDLERS = {
     "greenhouse": _fill_greenhouse,
     "lever": _fill_lever,
     "ashby": _fill_ashby,
     "workable": _fill_workable,
+    "workday": _fill_workday,
 }
 
 
